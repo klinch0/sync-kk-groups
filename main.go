@@ -82,10 +82,13 @@ func syncGroups(client *gocloak.GoCloak, token, realm string, namespaces, postfi
 	return nil
 }
 
-func watchNamespaces(clientset *kubernetes.Clientset, namespaceFilter string, postfixes []string, client *gocloak.GoCloak, token string, realm string) {
-	watcher, err := clientset.CoreV1().Namespaces().Watch(context.TODO(), metav1.ListOptions{
-		LabelSelector: namespaceFilter,
-	})
+func watchNamespaces(clientset *kubernetes.Clientset, filter string, postfixes []string, client *gocloak.GoCloak, realm string, KeycloakUser string, KeycloakPass string) {
+
+	regex, err := regexp.Compile(filter)
+	if err != nil {
+		log.Fatalf("invalid filter regex: %v", err)
+	}
+	watcher, err := clientset.CoreV1().Namespaces().Watch(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Fatalf("failed to start watch for namespaces: %v", err)
 	}
@@ -94,21 +97,24 @@ func watchNamespaces(clientset *kubernetes.Clientset, namespaceFilter string, po
 	log.Println("Watching for namespace changes...")
 
 	for event := range watcher.ResultChan() {
-		switch event.Type {
-		case watch.Added:
-			ns := event.Object.(*v1.Namespace)
-			log.Printf("Namespace added: %s", ns.Name)
-			createGroupsForNamespace(client, token, realm, ns.Name, postfixes)
+		ns := event.Object.(*v1.Namespace)
 
-		case watch.Deleted:
-			ns := event.Object.(*v1.Namespace)
-			log.Printf("Namespace deleted: %s", ns.Name)
-			deleteGroupsForNamespace(client, token, realm, ns.Name, postfixes)
+		if regex.MatchString(ns.Name) {
+			token, err := client.LoginAdmin(context.TODO(), KeycloakUser, KeycloakPass, "master")
+			if err != nil {
+				log.Fatalf("failed to login to Keycloak: %v", err)
+			}
+			switch event.Type {
+			case watch.Added:
+				log.Printf("Namespace added: %s", ns.Name)
+				createGroupsForNamespace(client, token.AccessToken, realm, ns.Name, postfixes)
 
-		case watch.Modified:
-			ns := event.Object.(*v1.Namespace)
-			log.Printf("Namespace modified: %s", ns.Name)
+			case watch.Deleted:
+				log.Printf("Namespace deleted: %s", ns.Name)
+				deleteGroupsForNamespace(client, token.AccessToken, realm, ns.Name, postfixes)
+			}
 		}
+
 	}
 }
 
@@ -189,5 +195,5 @@ func main() {
 		log.Fatalf("failed to sync groups: %v", err)
 	}
 
-	watchNamespaces(clientset, config.NamespaceFilter, config.GroupPostfixes, client, token.AccessToken, config.Realm)
+	watchNamespaces(clientset, config.NamespaceFilter, config.GroupPostfixes, client, config.Realm, config.KeycloakUser, config.KeycloakPass)
 }

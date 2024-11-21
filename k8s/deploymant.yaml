@@ -16,12 +16,12 @@ spec:
       serviceAccountName: sync-groups
       containers:
         - name: sync-groups
-          image: kklinch0/sync:0.0.4
+          image: kklinch0/sync:0.0.6
           env:
             - name: NAMESPACE_FILTER
               value: "tenant-.*"
             - name: GROUP_POSTFIXES
-              value: "-view,-use,-admin,-super-admin"
+              value: "view,use,admin,super-admin"
             - name: KEYCLOAK_URL
               value: "https://keycloak.infra.aenix.org/"
             - name: KEYCLOAK_USER

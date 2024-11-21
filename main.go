@@ -73,7 +73,11 @@ func syncGroups(client *gocloak.GoCloak, token, realm string, namespaces, postfi
 
 	for groupName := range existingGroupSet {
 		if strings.HasPrefix(groupName, GroupsPrefix) && !desiredGroups[groupName] {
-			err := client.DeleteGroup(context.TODO(), token, realm, groupName)
+			gr, err := client.GetGroupByPath(context.TODO(), token, realm, groupName)
+			if err != nil {
+				log.Printf("failed to find group by path %s: %v", groupName, err)
+			}
+			err = client.DeleteGroup(context.TODO(), token, realm, *gr.ID)
 			if err != nil {
 				log.Printf("failed to delete group %s: %v", groupName, err)
 			}
@@ -149,7 +153,11 @@ func createGroupsForNamespace(client *gocloak.GoCloak, token string, realm strin
 func deleteGroupsForNamespace(client *gocloak.GoCloak, token string, realm string, namespace string, postfixes []string) {
 	for _, postfix := range postfixes {
 		groupName := fmt.Sprintf("%s-%s", namespace, postfix)
-		err := client.DeleteGroup(context.TODO(), token, realm, groupName)
+		gr, err := client.GetGroupByPath(context.TODO(), token, realm, groupName)
+		if err != nil {
+			log.Printf("failed to find group by path %s: %v", groupName, err)
+		}
+		err = client.DeleteGroup(context.TODO(), token, realm, *gr.ID)
 		if err != nil {
 			log.Printf("failed to delete group %s: %v", groupName, err)
 		} else {

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sync-groups
+  namespace: cozy-keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sync-groups
+  template:
+    metadata:
+      labels:
+        app: sync-groups
+    spec:
+      serviceAccountName: sync-groups
+      containers:
+        - name: sync-groups
+          image: kklinch0/sync:0.0.4
+          env:
+            - name: NAMESPACE_FILTER
+              value: "tenant-.*"
+            - name: GROUP_POSTFIXES
+              value: "-view,-use,-admin,-super-admin"
+            - name: KEYCLOAK_URL
+              value: "https://keycloak.infra.aenix.org/"
+            - name: KEYCLOAK_USER
+              value: "admin"
+            - name: KEYCLOAK_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-credentials
+                  key: admin
+            - name: KEYCLOAK_REALM
+              value: "cozy"
+            - name: GROUPS_PREFIX
+              value: "tenant-"
